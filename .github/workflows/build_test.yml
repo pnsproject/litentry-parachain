@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ rococo-v1 ]
+    branches: [ rococo-v1, rococo-parachain-initial-access ]
   pull_request:
-    branches: [ rococo-v1 ]
+    branches: [ rococo-v1, rococo-parachain-initial-access  ]
 
 env:
   CARGO_TERM_COLOR: always
