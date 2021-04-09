@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ rococo-v1 ]
+    branches: [ rococo-v1, runtime-update ]
   pull_request:
-    branches: [ rococo-v1 ]
+    branches: [ rococo-v1, runtime-update ]
 
 env:
   CARGO_TERM_COLOR: always
