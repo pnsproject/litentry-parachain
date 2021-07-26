@@ -43,6 +43,9 @@ pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Percent, Perbill, Permill};
 
+// TEE
+pub use pallet_teerex::Call as TeerexCall;
+
 // XCM imports
 use pallet_xcm::{EnsureXcm, IsMajorityOfBody, XcmPassthrough};
 use polkadot_parachain::primitives::Sibling;
@@ -90,6 +93,9 @@ pub const DAYS: BlockNumber = HOURS * 24;
 pub const MILLICENTS: Balance = 1_000_000_000;
 pub const CENTS: Balance = 1_000 * MILLICENTS;
 pub const DOLLARS: Balance = 100 * CENTS;
+
+/// A timestamp: milliseconds since the unix epoch.
+pub type Moment = u64;
 
 pub const fn deposit(items: u32, bytes: u32) -> Balance {
 	items as Balance * 15 * CENTS + (bytes as Balance) * 6 * CENTS
@@ -741,6 +747,17 @@ impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 }
 
+// TEE
+parameter_types! {
+	pub const MomentsPerDay: Moment = 86_400_000; // [ms/d]
+}
+impl pallet_teerex::Config for Runtime {
+	type Event = Event;
+	type Currency = pallet_balances::Pallet<Runtime>;
+	type MomentsPerDay = MomentsPerDay;
+	type WeightInfo = ();
+}
+
 construct_runtime! {
 	pub enum Runtime where
 		Block = Block,
@@ -778,6 +795,8 @@ construct_runtime! {
 
 		AccountLinkerModule: pallet_account_linker::{Pallet, Call, Storage, Event<T>},
 		OffchainWorkerModule: pallet_offchain_worker::{Pallet, Call, Storage, Event<T>},
+
+		Teerex: pallet_teerex::{Pallet, Call, Storage, Event<T>} = 60,
 	}
 }
 

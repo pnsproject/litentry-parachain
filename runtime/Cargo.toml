@@ -69,6 +69,13 @@ pallet-offchain-worker = { git = "https://github.com/litentry/litentry-pallets",
 [build-dependencies]
 substrate-wasm-builder = { git = "https://github.com/paritytech/substrate", branch = "polkadot-v0.9.7" }
 
+# TEE
+[dependencies.pallet-teerex]
+default-features = false
+git = "https://github.com/scs/pallet-substratee-registry.git"
+branch = "runtime-benchmarks-v0.9.7"
+package = 'pallet-teerex'
+
 [features]
 default = [ "std" ]
 std = [
@@ -120,4 +127,6 @@ std = [
 	"xcm-executor/std",
 	"log/std",
 	"max-encoded-len/std",
+	# TEE
+	"pallet-teerex/std"
 ]
