@@ -11,6 +11,8 @@ use sp_core::{
 	u32_trait::{_1, _2, _3, _4, _5},
 	OpaqueMetadata,
 };
+use sp_core::crypto::AccountId32;
+
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, SaturatedConversion},
@@ -675,6 +677,8 @@ parameter_types! {
 	pub const QueryTaskRedundancy: u32 = 3;
 	pub const QuerySessionLength: u32 = 5;
 	pub const OcwQueryReward: Balance = 1 * DOLLARS;
+	pub const MaximumWeightForDataAggregation: Weight = 100_000_000_000;
+	pub const MaximumCommitsPerSession: u32 = 100;
 }
 
 impl pallet_offchain_worker::Config for Runtime {
@@ -688,6 +692,8 @@ impl pallet_offchain_worker::Config for Runtime {
 	type Reward = ();
 	type OcwQueryReward = OcwQueryReward;
 	type WeightInfo = pallet_offchain_worker::weights::SubstrateWeight<Runtime>;
+	type MaximumWeightForDataAggregation = MaximumWeightForDataAggregation;
+	type MaximumCommitsPerSession = MaximumCommitsPerSession;
 }
 
 impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
@@ -785,9 +791,17 @@ impl orml_nft::Config for Runtime {
 	type MaxTokenMetadata = MaxTokenMetadata;
 }
 
+parameter_types! {
+	pub const ClassCreationFee: u32 = 100;
+	pub const Pot: AccountId = AccountId32::new([9u8; 32]);
+}
+
 impl pallet_nft::Config for Runtime {
+	type Currency = Balances;
 	type Event = Event;
 	type WeightInfo = pallet_nft::weights::SubstrateWeight<Runtime>;
+	type ClassCreationFee = ClassCreationFee;
+	type Pot = Pot;
 }
 
 construct_runtime! {

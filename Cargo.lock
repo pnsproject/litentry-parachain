@@ -4797,7 +4797,7 @@ dependencies = [
 [[package]]
 name = "pallet-account-linker"
 version = "0.1.0"
-source = "git+https://github.com/litentry/litentry-pallets?branch=polkadot-v0.9.8#be69ead68654d87e83d3b98b967b3c55ef7ff197"
+source = "git+https://github.com/litentry/litentry-pallets?branch=dev#f79883760c8f14f62f0d2b4d7cff84d654e356fd"
 dependencies = [
  "frame-benchmarking",
  "frame-support",
@@ -5156,7 +5156,7 @@ dependencies = [
 [[package]]
 name = "pallet-nft"
 version = "0.0.1"
-source = "git+https://github.com/litentry/litentry-pallets?branch=polkadot-v0.9.8#be69ead68654d87e83d3b98b967b3c55ef7ff197"
+source = "git+https://github.com/litentry/litentry-pallets?branch=dev#f79883760c8f14f62f0d2b4d7cff84d654e356fd"
 dependencies = [
  "enumflags2",
  "frame-benchmarking",
@@ -5188,7 +5188,7 @@ dependencies = [
 [[package]]
 name = "pallet-offchain-worker"
 version = "0.0.1"
-source = "git+https://github.com/litentry/litentry-pallets?branch=polkadot-v0.9.8#be69ead68654d87e83d3b98b967b3c55ef7ff197"
+source = "git+https://github.com/litentry/litentry-pallets?branch=dev#f79883760c8f14f62f0d2b4d7cff84d654e356fd"
 dependencies = [
  "alt_serde",
  "frame-benchmarking",
