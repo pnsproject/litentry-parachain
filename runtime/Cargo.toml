@@ -64,9 +64,9 @@ xcm-executor = { git = "https://github.com/paritytech/polkadot", default-feature
 pallet-xcm = { git = "https://github.com/paritytech/polkadot", default-features = false, branch = "release-v0.9.8" }
 
 # litentry pallets
-pallet-account-linker = { git = "https://github.com/litentry/litentry-pallets", default-features = false, branch = "polkadot-v0.9.8" }
-pallet-offchain-worker = { git = "https://github.com/litentry/litentry-pallets", default-features = false, branch = "polkadot-v0.9.8" }
-pallet-nft = { git = "https://github.com/litentry/litentry-pallets", default-features = false, branch = "polkadot-v0.9.8" }
+pallet-account-linker = { git = "https://github.com/litentry/litentry-pallets", default-features = false, branch = "dev" }
+pallet-offchain-worker = { git = "https://github.com/litentry/litentry-pallets", default-features = false, branch = "dev" }
+pallet-nft = { git = "https://github.com/litentry/litentry-pallets", default-features = false, branch = "dev" }
 
 orml-nft = { git = "https://github.com/open-web3-stack/open-runtime-module-library", default-features = false, rev = "ca054d3078a8d157d0c176ed319d6ff49f38d349" }
 
