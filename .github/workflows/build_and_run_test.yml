@@ -2,7 +2,7 @@ name: Build & Test
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ dev, dev_token_info_event ]
   pull_request:
     branches: [ dev ]
 
