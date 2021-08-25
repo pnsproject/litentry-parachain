@@ -792,7 +792,7 @@ impl orml_nft::Config for Runtime {
 }
 
 parameter_types! {
-	pub const ClassCreationFee: u32 = 100;
+	pub const ClassCreationFee: Balance = 100 * DOLLARS;
 	pub const Pot: AccountId = AccountId32::new([9u8; 32]);
 }
 
