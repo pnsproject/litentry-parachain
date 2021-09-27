@@ -26,7 +26,7 @@ fn load_spec(
 ) -> std::result::Result<Box<dyn sc_service::ChainSpec>, String> {
 	Ok(match id {
 		"staging" => Box::new(chain_spec::staging_test_net(para_id)),
-		"" => Box::new(chain_spec::get_chain_spec(para_id)),
+		"" | "dev" => Box::new(chain_spec::get_chain_spec(para_id)),
 		path => {
 			let chain_spec = chain_spec::ChainSpec::from_json_file(path.into())?;
 			Box::new(chain_spec)
