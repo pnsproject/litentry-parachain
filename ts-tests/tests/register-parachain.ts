@@ -22,7 +22,7 @@ async function registerParachain(api: ApiPromise, config: any) {
     const registry = new TypeRegistry();
 
     const tx = api.tx.sudo.sudo(
-        api.tx.parasSudoWrapper.sudoScheduleParaInitialize(2022, {
+        api.tx.parasSudoWrapper.sudoScheduleParaInitialize(2013, {
             genesisHead: new Bytes(registry, genesisHeadBytes),
             validationCode: new Bytes(registry, validationCodeBytes),
             parachain: true,
@@ -41,12 +41,6 @@ async function registerParachain(api: ApiPromise, config: any) {
     const provider = new WsProvider(config.relaynode_ws);
     const api = await ApiPromise.create({
         provider: provider,
-        types: {
-            // mapping the actual specified address format
-            Address: 'MultiAddress',
-            // mapping the lookup
-            LookupSource: 'MultiAddress',
-        },
     });
 
     await registerParachain(api, config);

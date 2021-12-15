@@ -17,8 +17,9 @@
 use cumulus_primitives_core::ParaId;
 use litentry_parachain_runtime::{
 	AccountId, AuraId, Balance, BalancesConfig, CollatorSelectionConfig, CouncilMembershipConfig,
-	GenesisConfig, ParachainInfoConfig, PnsNftConfig, SessionConfig, Signature, SudoConfig,
-	SystemConfig, TechnicalCommitteeMembershipConfig, UNIT, WASM_BINARY,
+	GenesisConfig, ParachainInfoConfig, PnsNftConfig, PnsPriceOracleConfig, PnsRedeemCodeConfig,
+	PnsRegistrarConfig, PnsRegistryConfig, PnsResolversConfig, SessionConfig, Signature,
+	SudoConfig, SystemConfig, TechnicalCommitteeMembershipConfig, UNIT, WASM_BINARY,
 };
 use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup, Properties};
 use sc_service::ChainType;
@@ -26,12 +27,15 @@ use sc_telemetry::TelemetryEndpoints;
 use serde::{Deserialize, Serialize};
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
+use std::collections::BTreeSet;
+
+const DEFAULT_PARA_ID: u32 = 2013;
 
 /// Specialized `ChainSpec` for the normal parachain runtime.
 pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig, Extensions>;
 
 /// Helper function to generate a crypto pair from seed
-pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
+pub fn get_public_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
 	TPublic::Pair::from_string(&format!("//{}", seed), None)
 		.expect("static values are valid; qed")
 		.public()
@@ -56,26 +60,19 @@ impl Extensions {
 
 type AccountPublic = <Signature as Verify>::Signer;
 
+/// Generate collator keys from seed.
+///
+/// This function's return type must always match the session keys of the chain in tuple format.
+pub fn get_collator_keys_from_seed(seed: &str) -> AuraId {
+	get_public_from_seed::<AuraId>(seed)
+}
+
 /// Helper function to generate an account ID from seed
 pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
 where
 	AccountPublic: From<<TPublic::Pair as Pair>::Public>,
 {
-	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
-}
-
-/// Helper function to generate a crypto pair from seed
-pub fn get_pair_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
-	TPublic::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
-}
-
-/// Generate collator keys from seed.
-///
-/// This function's return type must always match the session keys of the chain in tuple format.
-pub fn get_collator_keys_from_seed(seed: &str) -> AuraId {
-	get_pair_from_seed::<AuraId>(seed)
+	AccountPublic::from(get_public_from_seed::<TPublic>(seed)).into_account()
 }
 
 pub fn parachain_properties(symbol: &str, decimals: u32, ss58format: u32) -> Option<Properties> {
@@ -109,10 +106,10 @@ struct GenesisInfo {
 	telemetry_endpoints: Vec<String>,
 }
 
-pub fn get_chain_spec_dev(id: ParaId) -> ChainSpec {
+pub fn get_chain_spec_dev() -> ChainSpec {
 	ChainSpec::from_genesis(
 		"Litentry-dev",
-		"Litentry-dev",
+		"litentry-dev",
 		ChainType::Development,
 		move || {
 			generate_genesis(
@@ -141,18 +138,18 @@ pub fn get_chain_spec_dev(id: ParaId) -> ChainSpec {
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
 				],
 				vec![get_account_id_from_seed::<sr25519::Public>("Alice")],
-				id,
+				DEFAULT_PARA_ID.into(),
 			)
 		},
-		vec![],
+		Vec::new(),
 		None,
-		Some("Litentry"),
+		Some("litentry"),
 		default_parachain_properties(),
-		Extensions { relay_chain: "rococo-local".into(), para_id: id.into() },
+		Extensions { relay_chain: "rococo-local".into(), para_id: DEFAULT_PARA_ID },
 	)
 }
 
-pub fn get_chain_spec_staging(id: ParaId) -> ChainSpec {
+pub fn get_chain_spec_staging() -> ChainSpec {
 	// Staging keys are derivative keys based on a single master secret phrase:
 	//
 	// root: 	$SECRET
@@ -161,21 +158,21 @@ pub fn get_chain_spec_staging(id: ParaId) -> ChainSpec {
 	get_chain_spec_from_genesis_info(
 		include_bytes!("../res/genesis_info/staging.json"),
 		"Litentry-staging",
-		"Litentry-staging",
+		"litentry-staging",
 		ChainType::Local,
 		"rococo-local".into(),
-		id,
+		DEFAULT_PARA_ID.into(),
 	)
 }
 
-pub fn get_chain_spec_prod(id: ParaId) -> ChainSpec {
+pub fn get_chain_spec_prod() -> ChainSpec {
 	get_chain_spec_from_genesis_info(
 		include_bytes!("../res/genesis_info/prod.json"),
 		"Litentry",
-		"Litentry",
+		"litentry",
 		ChainType::Live,
 		"polkadot".into(),
-		id,
+		DEFAULT_PARA_ID.into(),
 	)
 }
 
@@ -230,7 +227,7 @@ fn get_chain_spec_from_genesis_info(
 			)
 			.expect("Invalid telemetry URL; qed."),
 		),
-		Some("Litentry"),
+		Some("litentry"),
 		default_parachain_properties(),
 		Extensions { relay_chain: relay_chain_name, para_id: para_id.into() },
 	)
@@ -248,7 +245,6 @@ fn generate_genesis(
 	GenesisConfig {
 		system: SystemConfig {
 			code: WASM_BINARY.expect("WASM binary was not build, please build it!").to_vec(),
-			changes_trie_config: Default::default(),
 		},
 		balances: BalancesConfig { balances: endowed_accounts },
 		sudo: SudoConfig { key: root_key },
@@ -265,7 +261,7 @@ fn generate_genesis(
 				.map(|(acc, aura)| {
 					(
 						acc.clone(),                                      // account id
-						acc.clone(),                                      // validator id
+						acc,                                              // validator id
 						litentry_parachain_runtime::SessionKeys { aura }, // session keys
 					)
 				})
@@ -296,11 +292,29 @@ fn generate_genesis(
 					get_account_id_from_seed::<sr25519::Public>("Alice"),
 					vec![3, 2, 1],
 					Default::default(),
-					sp_core::convert_hash::<sp_core::H256, [u8; 32]>(&sp_io::hashing::keccak_256(
-						"dot".as_bytes(),
-					)),
+					sp_core::convert_hash::<sp_core::H256, [u8; 32]>(
+						&sp_core::hashing::keccak_256("dot".as_bytes()),
+					),
 				)],
 			)],
 		},
+		pns_registry: PnsRegistryConfig {
+			origin: vec![],
+			official: Some(get_account_id_from_seed::<sr25519::Public>("Alice")),
+			managers: vec![get_account_id_from_seed::<sr25519::Public>("Alice")],
+		},
+		pns_registrar: PnsRegistrarConfig { infos: vec![], blacklist: BTreeSet::new() },
+		pns_redeem_code: PnsRedeemCodeConfig { redeems: None },
+		pns_price_oracle: PnsPriceOracleConfig {
+			base_prices: vec![
+				10000, 10000, 10000, 10000, 7000, 7000, 7000, 4000, 4000, 4000, 3000, 3000, 3000,
+				2000, 2000, 2000, 1000, 1000, 1000, 1000,
+			],
+			rent_prices: vec![
+				10000, 10000, 10000, 10000, 7000, 7000, 7000, 4000, 4000, 4000, 3000, 3000, 3000,
+				2000, 2000, 2000, 1000, 1000, 1000, 1000,
+			],
+		},
+		pns_resolvers: PnsResolversConfig { accounts: vec![], texts: vec![] },
 	}
 }

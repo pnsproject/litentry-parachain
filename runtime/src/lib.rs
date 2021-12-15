@@ -15,6 +15,7 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::identity_op)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
 #![recursion_limit = "256"]
 
@@ -36,7 +37,7 @@ use sp_core::{
 };
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto},
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, ConvertInto, Verify},
 	transaction_validity::{TransactionSource, TransactionValidity},
 	ApplyExtrinsicResult,
 };
@@ -52,7 +53,7 @@ use sp_version::RuntimeVersion;
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{
 	construct_runtime, match_type, parameter_types,
-	traits::{Everything, InstanceFilter},
+	traits::{Contains, Everything, InstanceFilter, Nothing},
 	weights::{
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
 		DispatchClass, IdentityFee, Weight,
@@ -77,10 +78,10 @@ use polkadot_parachain::primitives::Sibling;
 use xcm::latest::prelude::*;
 use xcm_builder::{
 	AccountId32Aliases, AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, CurrencyAdapter,
-	EnsureXcmOrigin, FixedWeightBounds, IsConcrete, LocationInverter, NativeAsset,
-	ParentAsSuperuser, ParentIsDefault, RelayChainAsNative, SiblingParachainAsNative,
-	SiblingParachainConvertsVia, SignedAccountId32AsNative, SignedToAccountId32,
-	SovereignSignedViaLocation, TakeWeightCredit, UsingComponents,
+	EnsureXcmOrigin, FixedWeightBounds, IsConcrete, LocationInverter, NativeAsset, ParentIsDefault,
+	RelayChainAsNative, SiblingParachainAsNative, SiblingParachainConvertsVia,
+	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
+	UsingComponents,
 };
 use xcm_executor::{Config, XcmExecutor};
 
@@ -131,12 +132,20 @@ impl_opaque_keys! {
 /// This runtime version.
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("litentry"),
-	impl_name: create_runtime_str!("litentry"),
+	// Note:
+	// It's important to match `litentry-parachain-runtime`, which is runtime pkg name
+	// otherwise no extrinsic can be submitted.
+	// In logs it's shown:
+	// Failed to submit extrinsic: Extrinsic verification error: Runtime error: Execution failed:
+	// Other("Wasm execution trapped: wasm trap: unreachable ...
+	//
+	// However our CI passes (TODO)
+	spec_name: create_runtime_str!("litentry-parachain"),
+	impl_name: create_runtime_str!("litentry-parachain"),
 	authoring_version: 1,
-	// same versioning-mechanism as polkadot, corresponds to 0.9.0 TOML version
+	// same versioning-mechanism as polkadot, corresponds to 0.9.1 TOML version
 	// last digit is used for minor updates, like 9110 -> 9111 in polkadot
-	spec_version: 9000,
+	spec_version: 9010,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
@@ -229,9 +238,19 @@ impl frame_system::Config for Runtime {
 	/// The weight of database operations that the runtime can invoke.
 	type DbWeight = RocksDbWeight;
 	/// The basic call filter to use in dispatchable.
-	type BaseCallFilter = Everything;
+	type BaseCallFilter = BaseCallFilter;
 	/// Weight information for the extrinsics of this pallet.
-	type SystemWeightInfo = weights::frame_system::WeightInfo<Runtime>;
+	///
+	/// TODO:
+	/// use () for polkadot-v0.9.13 version as the generated frame_system weigts
+	/// breaks compilation: missing trait implementation `set_changes_trie_config`.
+	/// It looks like an upstream issue.
+	///
+	/// our runtime/src/weights/frame_system.rs is intentionally not updated.
+	///
+	/// Also note the statemine code:
+	/// https://github.com/paritytech/cumulus/blob/master/polkadot-parachains/statemine/src/lib.rs#L152
+	type SystemWeightInfo = ();
 	/// Block & extrinsics weights: base values and limits.
 	type BlockWeights = RuntimeBlockWeights;
 	/// The maximum length of a block (in bytes).
@@ -391,6 +410,7 @@ impl pallet_scheduler::Config for Runtime {
 	type ScheduleOrigin = EnsureRoot<AccountId>;
 	type MaxScheduledPerBlock = MaxScheduledPerBlock;
 	type WeightInfo = weights::pallet_scheduler::WeightInfo<Runtime>;
+	type OriginPrivilegeCmp = frame_support::traits::EqualPrivilegeOnly;
 }
 
 parameter_types! {
@@ -416,6 +436,7 @@ impl pallet_balances::Config for Runtime {
 impl pallet_utility::Config for Runtime {
 	type Event = Event;
 	type Call = Call;
+	type PalletsOrigin = OriginCaller;
 	type WeightInfo = weights::pallet_utility::WeightInfo<Runtime>;
 }
 
@@ -531,7 +552,7 @@ impl pallet_membership::Config<pallet_membership::Instance1> for Runtime {
 	type MembershipInitialized = Council;
 	type MembershipChanged = Council;
 	type MaxMembers = CouncilMaxMembers;
-	type WeightInfo = pallet_membership::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = weights::pallet_membership::WeightInfo<Runtime>;
 }
 
 parameter_types! {
@@ -613,9 +634,9 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 	type Event = Event;
 	type OnValidationData = ();
 	type SelfParaId = parachain_info::Pallet<Runtime>;
-	type OutboundXcmpMessageSource = XcmpQueue;
 	type DmpMessageHandler = DmpQueue;
 	type ReservedDmpWeight = ReservedDmpWeight;
+	type OutboundXcmpMessageSource = XcmpQueue;
 	type XcmpMessageHandler = XcmpQueue;
 	type ReservedXcmpWeight = ReservedXcmpWeight;
 }
@@ -625,8 +646,8 @@ impl parachain_info::Config for Runtime {}
 impl cumulus_pallet_aura_ext::Config for Runtime {}
 
 parameter_types! {
-	pub const DotLocation: MultiLocation = MultiLocation::parent();
-	pub const RelayNetwork: NetworkId = NetworkId::Polkadot;
+	pub const RelayLocation: MultiLocation = MultiLocation::parent();
+	pub const RelayNetwork: NetworkId = NetworkId::Any;
 	pub RelayChainOrigin: Origin = cumulus_pallet_xcm::Origin::Relay.into();
 	pub Ancestry: MultiLocation = Parachain(ParachainInfo::parachain_id().into()).into();
 }
@@ -648,7 +669,7 @@ pub type LocalAssetTransactor = CurrencyAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
-	IsConcrete<DotLocation>,
+	IsConcrete<RelayLocation>,
 	// Do a simple punn to convert an AccountId32 MultiLocation into a native chain account ID:
 	LocationToAccountId,
 	// Our chain's account ID type (we can't get away without mentioning it explicitly):
@@ -666,14 +687,11 @@ pub type XcmOriginToTransactDispatchOrigin = (
 	// foreign chains who want to have a local sovereign account on this chain which they control.
 	SovereignSignedViaLocation<LocationToAccountId, Origin>,
 	// Native converter for Relay-chain (Parent) location; will converts to a `Relay` origin when
-	// recognised.
+	// recognized.
 	RelayChainAsNative<RelayChainOrigin, Origin>,
 	// Native converter for sibling Parachains; will convert to a `SiblingPara` origin when
-	// recognised.
+	// recognized.
 	SiblingParachainAsNative<cumulus_pallet_xcm::Origin, Origin>,
-	// Superuser converter for the Relay-chain (Parent) location. This will allow it to issue a
-	// transaction from the Root origin.
-	ParentAsSuperuser<Origin>,
 	// Native signed account converter; this just converts an `AccountId32` origin into a normal
 	// `Origin::Signed` origin of the same 32-byte value.
 	SignedAccountId32AsNative<RelayNetwork, Origin>,
@@ -709,11 +727,11 @@ impl Config for XcmConfig {
 	type AssetTransactor = LocalAssetTransactor;
 	type OriginConverter = XcmOriginToTransactDispatchOrigin;
 	type IsReserve = NativeAsset;
-	type IsTeleporter = NativeAsset; // Should be enough to allow teleportation of DOT
+	type IsTeleporter = (); // Teleporting is disabled.
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, Call, MaxInstructions>;
-	type Trader = UsingComponents<IdentityFee<Balance>, DotLocation, AccountId, Balances, ()>;
+	type Trader = UsingComponents<IdentityFee<Balance>, RelayLocation, AccountId, Balances, ()>;
 	type ResponseHandler = PolkadotXcm;
 	type AssetTrap = PolkadotXcm;
 	type AssetClaims = PolkadotXcm;
@@ -741,16 +759,19 @@ impl pallet_xcm::Config for Runtime {
 	type SendXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
 	type XcmRouter = XcmRouter;
 	type ExecuteXcmOrigin = EnsureXcmOrigin<Origin, LocalOriginToLocation>;
-	type XcmExecuteFilter = Everything;
+	type XcmExecuteFilter = Nothing;
+	// ^ Disable dispatchable execute on the XCM pallet.
+	// Needs to be `Everything` for local testing.
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type XcmTeleportFilter = Everything;
-	type XcmReserveTransferFilter = Everything;
+	type XcmReserveTransferFilter = Nothing;
 	type Weigher = FixedWeightBounds<UnitWeightCost, Call, MaxInstructions>;
 	type LocationInverter = LocationInverter<Ancestry>;
 	type Origin = Origin;
 	type Call = Call;
 
 	const VERSION_DISCOVERY_QUEUE_SIZE: u32 = 100;
+	// ^ Override for AdvertisedXcmVersion default
 	type AdvertisedXcmVersion = pallet_xcm::CurrentXcmVersion;
 }
 
@@ -769,7 +790,7 @@ impl cumulus_pallet_xcmp_queue::Config for Runtime {
 impl cumulus_pallet_dmp_queue::Config for Runtime {
 	type Event = Event;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
-	type ExecuteOverweightOrigin = frame_system::EnsureRoot<AccountId>;
+	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
 }
 
 parameter_types! {
@@ -837,14 +858,11 @@ impl pallet_vesting::Config for Runtime {
 	const MAX_VESTING_SCHEDULES: u32 = 28;
 }
 
-// pns deploy
-use pns_registrar::*;
-
 parameter_types! {
 	pub const MaxMetadata: u32 = 15;
 }
 
-impl nft::Config for Runtime {
+impl pns_registrar::nft::Config for Runtime {
 	type ClassId = u32;
 
 	type TokenId = Hash;
@@ -853,44 +871,38 @@ impl nft::Config for Runtime {
 
 	type ClassData = ();
 
-	type TokenData = registry::Record;
+	type TokenData = pns_registrar::registry::Record;
 
 	type MaxClassMetadata = MaxMetadata;
 
 	type MaxTokenMetadata = MaxMetadata;
 }
-parameter_types! {
-	pub const Official: sp_runtime::AccountId32 = sp_runtime::AccountId32::new([212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133, 88, 133, 76, 205, 227, 154, 86, 132, 231, 165, 109, 162, 125]);
-	pub const Metadata: sp_std::vec::Vec<u8> = sp_std::vec::Vec::new();
-}
 
-impl registry::Config for Runtime {
+impl pns_registrar::registry::Config for Runtime {
 	type Event = Event;
 
-	type Official = Official;
+	type WeightInfo = weights::pns_registrar::WeightInfo;
 
-	type DefaultMetadata = Metadata;
-
-	type WeightInfo = weights::pns_pallets::WeightInfo<Runtime>;
-
-	type Registrar = registrar::Pallet<Runtime>;
+	type Registrar = pns_registrar::registrar::Pallet<Runtime>;
 
 	type ResolverId = u32;
 }
 
 parameter_types! {
-	pub const GracePeriod: BlockNumber = 90 * DAYS;
+	pub const GracePeriod: Moment = 90 * 24 * 60 * 60;
+	pub const MinRegistrationDuration: Moment = 28 * 24 * 60 * 60;
 	pub const DefaultCapacity: u32 = 20;
-	pub const SetSubnamePrice: Balance = 1;
-	pub const BlackList: sp_std::vec::Vec<Hash> = sp_std::vec::Vec::new();
 	pub const BaseNode: Hash = sp_core::H256([206, 21, 156, 243, 67, 128, 117, 125, 25, 50, 168, 228, 167, 78, 133, 232, 89, 87, 176, 167, 165, 45, 156, 86, 108, 10, 60, 141, 97, 51, 208, 247]);
 }
-impl registrar::Config for Runtime {
+
+pub type Moment = u64;
+
+impl pns_registrar::registrar::Config for Runtime {
 	type Event = Event;
 
 	type ResolverId = u32;
 
-	type Registry = registry::Pallet<Runtime>;
+	type Registry = pns_registrar::registry::Pallet<Runtime>;
 
 	type Currency = pallet_balances::Pallet<Runtime>;
 
@@ -898,36 +910,94 @@ impl registrar::Config for Runtime {
 
 	type DefaultCapacity = DefaultCapacity;
 
-	type SetSubnamePrice = SetSubnamePrice;
+	type BaseNode = BaseNode;
 
-	type BlackList = BlackList;
+	type WeightInfo = weights::pns_registrar::WeightInfo;
+
+	type MinRegistrationDuration = MinRegistrationDuration;
+
+	type PriceOracle = pns_registrar::price_oracle::Pallet<Runtime>;
+
+	type Moment = Moment;
+
+	type NowProvider = pallet_timestamp::Pallet<Runtime>;
+
+	type Manager = pns_registrar::registry::Pallet<Runtime>;
+}
+
+parameter_types! {
+	pub const MaximumLength: u8 = 10;
+	pub const RateScale: Balance = 100_000;
+}
+
+impl pns_registrar::price_oracle::Config for Runtime {
+	type Event = Event;
+
+	type Currency = pallet_balances::Pallet<Runtime>;
+
+	type MaximumLength = MaximumLength;
+
+	type WeightInfo = weights::pns_registrar::WeightInfo;
+
+	type Moment = Moment;
+
+	type ExchangeRate = TestRate;
+
+	type RateScale = RateScale;
+
+	type Manager = pns_registrar::registry::Pallet<Runtime>;
+}
+pub struct TestRate;
+
+impl pns_registrar::traits::ExchangeRate for TestRate {
+	type Balance = Balance;
+
+	fn get_exchange_rate() -> Self::Balance {
+		3_140_000
+	}
+}
+
+impl pns_registrar::redeem_code::Config for Runtime {
+	type Event = Event;
+
+	type WeightInfo = weights::pns_registrar::WeightInfo;
+
+	type Registrar = pns_registrar::registrar::Pallet<Runtime>;
 
 	type BaseNode = BaseNode;
 
-	type WeightInfo = weights::pns_pallets::WeightInfo<Runtime>;
+	type Moment = Moment;
 
-	type PriceOracle = TestPriceOracle;
+	type Public = <Signature as Verify>::Signer;
+
+	type Signature = Signature;
+
+	type Manager = pns_registrar::registry::Pallet<Runtime>;
 }
-pub struct TestPriceOracle;
 
-impl traits::PriceOracle for TestPriceOracle {
-	type Duration = BlockNumber;
-	type Balance = Balance;
+impl pns_resolvers::Config for Runtime {
+	type Event = Event;
 
-	fn renew_price(
-		name_len: usize,
-		expires: Self::Duration,
-		duration: Self::Duration,
-	) -> Self::Balance {
-		10
-	}
+	type WeightInfo = weights::pns_resolvers::WeightInfo;
 
-	fn registry_price(name_len: usize, duration: Self::Duration) -> Self::Balance {
-		9
-	}
+	type AccountIndex = u32;
 
-	fn register_fee(name_len: usize) -> Self::Balance {
-		8
+	type RegistryChecker = TestChecker;
+
+	type DomainHash = Hash;
+}
+
+pub struct TestChecker;
+
+impl pns_resolvers::traits::RegistryChecker for TestChecker {
+	type Hash = Hash;
+
+	type AccountId = AccountId;
+	// TODO: 跨链验证
+	fn check_node_useable(node: Self::Hash, owner: &Self::AccountId) -> bool {
+		use pns_registrar::traits::Registrar;
+		pns_registrar::nft::TokensByOwner::<Runtime>::contains_key((owner, 0, node)) &&
+			PnsRegistrar::check_expires_useable(node).is_ok()
 	}
 }
 
@@ -978,12 +1048,27 @@ construct_runtime! {
 		DmpQueue: cumulus_pallet_dmp_queue::{Pallet, Call, Storage, Event<T>} = 53,
 
 		// PNS
-		PnsNft: nft::{Pallet, Storage, Config<T>} = 54,
-		PnsRegistry: registry::{Pallet, Call,Storage, Event<T>} = 55,
-		PnsRegistrar: registrar::{Pallet, Call,Storage, Event<T>} = 56,
+		PnsNft: pns_registrar::nft,
+		PnsRegistry: pns_registrar::registry,
+		PnsRegistrar: pns_registrar::registrar,
+		PnsRedeemCode: pns_registrar::redeem_code,
+		PnsPriceOracle: pns_registrar::price_oracle,
+		PnsResolvers: pns_resolvers,
 
 		// TMP
 		Sudo: pallet_sudo::{Pallet, Call, Storage, Config<T>, Event<T>} = 255,
+	}
+}
+
+pub struct BaseCallFilter;
+impl Contains<Call> for BaseCallFilter {
+	fn contains(call: &Call) -> bool {
+		matches!(
+			call,
+			Call::Sudo(_) |
+            // System
+            Call::System(_) | Call::Timestamp(_) | Call::ParachainSystem(_)
+		)
 	}
 }
 
@@ -1093,6 +1178,21 @@ impl_runtime_apis! {
 		}
 	}
 
+	#[cfg(feature = "try-runtime")]
+	impl frame_try_runtime::TryRuntime<Block> for Runtime {
+		fn on_runtime_upgrade() -> (Weight, Weight) {
+			// NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
+			// have a backtrace here. If any of the pre/post migration checks fail, we shall stop
+			// right here and right now.
+			let weight = Executive::try_runtime_upgrade().unwrap();
+			(weight, RuntimeBlockWeights::get().max_block)
+		}
+
+		fn execute_block_no_check(block: Block) -> Weight {
+			Executive::execute_block_no_check(block)
+		}
+	}
+
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {
 		fn benchmark_metadata(extra: bool) -> (
@@ -1118,7 +1218,7 @@ impl_runtime_apis! {
 			list_benchmark!(list, extra, pallet_multisig, Multisig);
 
 			let storage_info = AllPalletsWithSystem::storage_info();
-			return (list, storage_info)
+			(list, storage_info)
 		}
 
 		fn dispatch_benchmark(

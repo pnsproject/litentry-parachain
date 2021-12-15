@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
+#![allow(clippy::type_complexity)]
+
 use cumulus_client_consensus_aura::{
 	build_aura_consensus, BuildAuraConsensusParams, SlotProportion,
 };
@@ -126,7 +128,7 @@ where
 
 	let (client, backend, keystore_container, task_manager) =
 		sc_service::new_full_parts::<Block, RuntimeApi, _>(
-			&config,
+			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
 		)?;
@@ -135,7 +137,7 @@ where
 	let telemetry_worker_handle = telemetry.as_ref().map(|(worker, _)| worker.handle());
 
 	let telemetry = telemetry.map(|(worker, telemetry)| {
-		task_manager.spawn_handle().spawn("telemetry", worker.run());
+		task_manager.spawn_handle().spawn("telemetry", None, worker.run());
 		telemetry
 	});
 
@@ -273,7 +275,6 @@ where
 			transaction_pool: transaction_pool.clone(),
 			spawn_handle: task_manager.spawn_handle(),
 			import_queue: import_queue.clone(),
-			on_demand: None,
 			block_announce_validator_builder: Some(Box::new(|_| block_announce_validator)),
 			warp_sync: None,
 		})?;
@@ -294,8 +295,6 @@ where
 	};
 
 	sc_service::spawn_tasks(sc_service::SpawnTasksParams {
-		on_demand: None,
-		remote_blockchain: None,
 		rpc_extensions_builder,
 		client: client.clone(),
 		transaction_pool: transaction_pool.clone(),
@@ -400,7 +399,7 @@ pub async fn start_litentry_parachain_node(
 				task_manager.spawn_handle(),
 				client.clone(),
 				transaction_pool,
-				prometheus_registry.clone(),
+				prometheus_registry,
 				telemetry.clone(),
 			);
 
@@ -448,7 +447,7 @@ pub async fn start_litentry_parachain_node(
 				block_import: client.clone(),
 				relay_chain_client: relay_chain_node.client.clone(),
 				relay_chain_backend: relay_chain_node.backend.clone(),
-				para_client: client.clone(),
+				para_client: client,
 				backoff_authoring_blocks: Option::<()>::None,
 				sync_oracle,
 				keystore,
@@ -512,7 +511,7 @@ pub fn litentry_parachain_build_import_queue(
 
 			Ok((time, slot))
 		},
-		registry: config.prometheus_registry().clone(),
+		registry: config.prometheus_registry(),
 		can_author_with: sp_consensus::CanAuthorWithNativeVersion::new(client.executor().clone()),
 		spawner: &task_manager.spawn_essential_handle(),
 		telemetry,

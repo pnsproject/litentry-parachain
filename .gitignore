@@ -4,10 +4,11 @@
 .DS_Store
 .cargo/config
 
-source/
-
 **/node_modules/
-**/generated-dev/
 **/para-*
+
+docker/yarn.lock
+docker/package.json
+docker/generated-dev/
 
 tags.lock

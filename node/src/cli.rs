@@ -15,7 +15,6 @@
 // along with Litentry.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::chain_spec;
-use sc_cli;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -57,6 +56,14 @@ pub enum Subcommand {
 	/// The custom benchmark subcommmand benchmarking runtime pallets.
 	#[structopt(name = "benchmark", about = "Benchmark runtime pallets.")]
 	Benchmark(frame_benchmarking_cli::BenchmarkCmd),
+
+	/// Try some command against runtime state.
+	#[cfg(feature = "try-runtime")]
+	TryRuntime(try_runtime_cli::TryRuntimeCmd),
+
+	/// Try some command against runtime state. Note: `try-runtime` feature must be enabled.
+	#[cfg(not(feature = "try-runtime"))]
+	TryRuntime,
 }
 
 /// Command for exporting the genesis state of the parachain
@@ -66,15 +73,15 @@ pub struct ExportGenesisStateCommand {
 	#[structopt(parse(from_os_str))]
 	pub output: Option<PathBuf>,
 
-	/// Id of the parachain this state is for.
-	///
-	/// Default: 2022
-	#[structopt(long)]
-	pub parachain_id: Option<u32>,
-
 	/// Write output in binary. Default is to write in hex.
 	#[structopt(short, long)]
 	pub raw: bool,
+
+	/// To not break parachain-launch
+	/// It doesn't have any effect.
+	/// Will be removed once parachain-launch is updated.
+	#[structopt(long)]
+	pub parachain_id: Option<u32>,
 
 	/// The name of the chain for that the genesis state should be exported.
 	#[structopt(long)]
@@ -110,9 +117,9 @@ pub struct Cli {
 	#[structopt(flatten)]
 	pub run: cumulus_client_cli::RunCmd,
 
-	/// Relaychain arguments
+	/// Relay chain arguments
 	#[structopt(raw = true)]
-	pub relaychain_args: Vec<String>,
+	pub relay_chain_args: Vec<String>,
 }
 
 #[derive(Debug)]

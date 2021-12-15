@@ -16,7 +16,7 @@ echo "running benchmark for $1"
 filename=${1//-/_}
 
 ./target/release/litentry-collator benchmark \
-    --chain=./source/local.json \
+    --chain=dev \
     --execution=wasm  \
     --db-cache=20 \
     --wasm-execution=compiled \
@@ -25,4 +25,5 @@ filename=${1//-/_}
     --heap-pages=4096 \
     --steps=20 \
     --repeat=50 \
+    --header=./LICENCE_HEADER \
     --output=./runtime/src/weights/"$filename".rs

@@ -29,11 +29,11 @@ help:
 build-all:
 	cargo build --release
 
-.PHONY: build-node ## Build release node only
+.PHONY: build-node ## Build release node with default features
 build-node:
 	cargo build -p $(call pkgid, $(NODE_BIN)) --release
 
-.PHONY: build-runtime ## Build release runtime only
+.PHONY: build-runtime ## Build release runtime
 build-runtime:
 	cargo build -p $(call pkgid, $(RUNTIME)) --release
 
@@ -45,12 +45,8 @@ srtool-build-wasm:
 build-docker:
 	@./scripts/build-docker.sh
 
-.PHONY: build-spec-dev ## Build specifiction without bootnodes
-build-spec-dev:
-	./target/release/$(NODE_BIN) build-spec --chain dev --disable-default-bootnode > ./source/local.json
-
-.PHONY: build-benchmark ## Build release version with `runtime-benchmarks`
-build-benchmark:
+.PHONY: build-node-benchmarks ## Build release version with `runtime-benchmarks` feature
+build-node-benchmarks:
 	cargo build --features runtime-benchmarks --release
 	
 # launching local dev networks
@@ -71,7 +67,7 @@ test-node:
 
 .PHONY: test-ci-docker ## Run CI tests with docker without clean-up
 test-ci-docker: launch-local-docker
-	@./scripts/run-ci-test.sh docker
+	@./scripts/run-ci-test.sh
 
 .PHONY: test-ci-binary ## Run CI tests with binary without clean-up
 test-ci-binary: launch-local-binary
@@ -93,65 +89,21 @@ clean-local-binary:
 generate-docker-compose-dev:
 	@./scripts/generate-docker-files.sh dev
 
-.PHONY: generate-docker-compose-staging ## Generate staging docker-compose files
-generate-docker-compose-staging:
-	@./scripts/generate-docker-files.sh staging
-
 # format
 
-.PHONY: format ## Format source code by `cargo fmt`
-format:
+.PHONY: fmtcheck ## cargo fmt check
+fmtcheck:
 	cargo fmt --all -- --check
 
-# benchmark for pallets
+.PHONY: fmt ## cargo fmt all
+fmt:
+	cargo fmt --all
 
-.PHONY: benchmark-frame-system ## Benchmark pallet `frame-system`
-benchmark-frame-system:
-	@./scripts/run-benchmark-pallet.sh frame-system
+# clippy
 
-.PHONY: benchmark-pallet-timestamp
-benchmark-pallet-timestamp:
-	@./scripts/run-benchmark-pallet.sh pallet-timestamp
-
-.PHONY: benchmark-pallet-utility
-benchmark-pallet-utility:
-	@./scripts/run-benchmark-pallet.sh pallet-utility
-
-.PHONY: benchmark-pallet-scheduler
-benchmark-pallet-scheduler:
-	@./scripts/run-benchmark-pallet.sh pallet-scheduler
-
-.PHONY: benchmark-pallet-treasury
-benchmark-pallet-treasury:
-	@./scripts/run-benchmark-pallet.sh pallet-treasury
-
-.PHONY: benchmark-pallet-democracy
-benchmark-pallet-democracy:
-	@./scripts/run-benchmark-pallet.sh pallet-democracy
-
-.PHONY: benchmark-pallet-collective
-benchmark-pallet-collective:
-	@./scripts/run-benchmark-pallet.sh pallet-collective
-
-.PHONY: benchmark-pallet-proxy
-benchmark-pallet-proxy:
-	@./scripts/run-benchmark-pallet.sh pallet-proxy
-
-.PHONY: benchmark-pallet-balances
-benchmark-pallet-balances:
-	@./scripts/run-benchmark-pallet.sh pallet-balances
-
-.PHONY: benchmark-pallet-membership
-benchmark-pallet-membership:
-	@./scripts/run-benchmark-pallet.sh pallet-membership
-
-.PHONY: benchmark-pallet-collator-selection
-benchmark-pallet-collator-selection:
-	@./scripts/run-benchmark-pallet.sh pallet-collator-selection
-
-.PHONY: benchmark-pallet-multisig
-benchmark-pallet-multisig:
-	@./scripts/run-benchmark-pallet.sh pallet-multisig
+.PHONY: clippy ## cargo clippy
+clippy:
+	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 define pkgid
 	$(shell cargo pkgid $1)
